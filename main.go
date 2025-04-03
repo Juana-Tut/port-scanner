@@ -86,6 +86,7 @@ func main() {
 	workers := flag.Int("workers", 100, "Specify the number of concurrent workers")
 	timeout := flag.Int("timeout", 5, "Specify the connection timeout in seconds")
 	jsonOutput := flag.Bool("json", false, "Output results in JSON format")
+    specificPorts := flag.String("ports", "", "Specify a comma-separated list of specific ports to scan")
 
 	flag.Parse() // Parse the command line flags
 
@@ -99,22 +100,39 @@ func main() {
 	var results []ScanResult // Slice to store scan results
 
 	startTime := time.Now() // Record the start time
-	totalPorts := *endPort - *startPort + 1 // Calculate the total number of ports scanned
+	var portsToScan []int // Slice to store specific ports to scan
+
+	if *specificPorts != "" {
+        portStrings := strings.Split(*specificPorts, ",")
+        for _, portStr := range portStrings {
+            port, err := strconv.Atoi(portStr)
+            if err != nil {
+                fmt.Printf("Invalid port: %s\n", portStr)
+                return
+            }
+            portsToScan = append(portsToScan, port)
+        }
+    } else {
+        for p := *startPort; p <= *endPort; p++ {
+            portsToScan = append(portsToScan, p)
+        }
+    }
+
+	totalPorts := len(portsToScan) * len(strings.Split(*targets, ",")) // Calculate the total number of ports scanned
 
 	targetList := strings.Split(*targets, ",") // Split the target string into a list of targets
 
     for i := 1; i <= *workers; i++ {// Create worker goroutines
 		wg.Add(1)
-		go worker(&wg, tasks, dialer, &openPorts, &mu, &progress, totalPorts*len(targetList), &results) // Start a worker goroutine
+		go worker(&wg, tasks, dialer, &openPorts, &mu, &progress, totalPorts, &results) // Start a worker goroutine
 	}
 
 	// Loop through the specified port range and send addresses to the tasks channel
 	for _, target := range targetList {	
-		for p := *startPort; p <= *endPort; p++ {
-			port := strconv.Itoa(p)
-			address := net.JoinHostPort(target, port) // Combine IP and port
-			tasks <- address// Send the address to the tasks channel
-		}
+		for _, port := range portsToScan {
+            address := net.JoinHostPort(target, strconv.Itoa(port))
+            tasks <- address
+        }
 	}
 	// Close the tasks channel after all addresses have been sent
 	close(tasks)

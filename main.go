@@ -19,17 +19,28 @@ func worker(wg *sync.WaitGroup, tasks chan string, dialer net.Dialer, openPorts 
     for addr := range tasks {
 		var success bool
 		for i := range maxRetries {      
-		conn, err := dialer.Dial("tcp", addr)
+		conn, err := dialer.Dial("tcp", addr)// Attempt to connect to the address
 		if err == nil {
-			conn.Close()
+			defer conn.Close()
 			fmt.Printf("Connection to %s was successful\n", addr)
 			mu.Lock() // Lock the mutex to safely update openPorts
 			*openPorts++ // Increment the open ports counter
 			mu.Unlock() // Unlock the mutex
 			success = true
+
+			//Banner grabbing
+			buffer := make([]byte, 1024) // Create a buffer to read data
+			conn.SetReadDeadline(time.Now().Add(2 * time.Second)) // Set a read deadline
+			n, err := conn.Read(buffer) // Read data from the connection
+			if err == nil {
+				fmt.Printf("Banner from %s: %s\n", addr, string(buffer[:n])) // Print the banner
+			} else {
+				fmt.Printf("Failed to read banner from %s: %v\n", addr,err) // Print the error
+				
+			}
 			break
 		}
-		backoff := time.Duration(1<<i) * time.Second
+		backoff := time.Duration(1<<i) * time.Second // Exponential backoff
 		fmt.Printf("Attempt %d to %s failed. Waiting %v...\n", i+1,  addr, backoff)
 		time.Sleep(backoff)
 	    }

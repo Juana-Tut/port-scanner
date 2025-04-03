@@ -48,11 +48,12 @@ func main() {
 	startPort := flag.Int("start-port", 1, "Specify the starting port")
 	endPort := flag.Int("end-port", 1024, "Specify the ending port")
 	workers := flag.Int("workers", 100, "Specify the number of concurrent workers")
-	
+	timeout := flag.Int("timeout", 5, "Specify the connection timeout in seconds")
+
 	flag.Parse() // Parse the command line flags
 
 	dialer := net.Dialer { // Create a new dialer 
-		Timeout: 5 * time.Second,
+		Timeout: time.Duration(*timeout) * time.Second,
 	}
 
 	var openPorts int // Counter for open ports
@@ -77,7 +78,7 @@ func main() {
 	duration := time.Since(startTime) // Calculate the duration
 	totalPorts := *endPort - *startPort + 1 // Calculate the total number of ports scanned
 
-	fmt.Printf("\nScan Summary:\n")
+	fmt.Printf("\nScan Summary\n")
 	fmt.Printf("Number of open ports: %d\n", openPorts)
 	fmt.Printf("Time taken: %s\n", duration)
 	fmt.Printf("Total ports scanned: %d\n", totalPorts)

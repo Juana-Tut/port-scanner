@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -62,7 +63,7 @@ func main() {
 	tasks := make(chan string, 100)
 
 	//Define and parse the target flag
-    target := flag.String("target","scanme.nmap.org", "Specify the IP address or hostname to scan")
+    targets := flag.String("targets","scanme.nmap.org", "Specify the IP address or hostname to scan")
 	startPort := flag.Int("start-port", 1, "Specify the starting port")
 	endPort := flag.Int("end-port", 1024, "Specify the ending port")
 	workers := flag.Int("workers", 100, "Specify the number of concurrent workers")
@@ -81,17 +82,22 @@ func main() {
 	startTime := time.Now() // Record the start time
 	totalPorts := *endPort - *startPort + 1 // Calculate the total number of ports scanned
 
+	targetList := strings.Split(*targets, ",") // Split the target string into a list of targets
+
     for i := 1; i <= *workers; i++ {// Create worker goroutines
 		wg.Add(1)
-		go worker(&wg, tasks, dialer, &openPorts, &mu, &progress, totalPorts) // Start a worker goroutine
+		go worker(&wg, tasks, dialer, &openPorts, &mu, &progress, totalPorts*len(targetList)) // Start a worker goroutine
 	}
 
 	// Loop through the specified port range and send addresses to the tasks channel
-	for p := *startPort; p <= *endPort; p++ {
-		port := strconv.Itoa(p)
-        address := net.JoinHostPort(*target, port) // Combine IP and port
-		tasks <- address// Send the address to the tasks channel
+	for _, target := range targetList {	
+		for p := *startPort; p <= *endPort; p++ {
+			port := strconv.Itoa(p)
+			address := net.JoinHostPort(target, port) // Combine IP and port
+			tasks <- address// Send the address to the tasks channel
+		}
 	}
+	// Close the tasks channel after all addresses have been sent
 	close(tasks)
 	wg.Wait() // Wait for all workers to finish
 
@@ -100,5 +106,5 @@ func main() {
 	fmt.Printf("\nScan Summary\n")
 	fmt.Printf("Number of open ports: %d\n", openPorts)
 	fmt.Printf("Time taken: %s\n", duration)
-	fmt.Printf("Total ports scanned: %d\n", totalPorts)
+	fmt.Printf("Total ports scanned: %d\n", totalPorts*len(targetList))
 }

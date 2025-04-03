@@ -4,6 +4,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"strconv"
@@ -39,24 +40,26 @@ func main() {
 	var wg sync.WaitGroup
 	tasks := make(chan string, 100)
 
-    target := "scanme.nmap.org"
+	//Define and parse the target flag
+    target := flag.String("target","scanme.nmap.org", "Specify the IP address or hostname to scan")
+	flag.Parse()
 
-	dialer := net.Dialer {
+	dialer := net.Dialer { // Create a new dialer 
 		Timeout: 5 * time.Second,
 	}
   
-	workers := 100
+	workers := 100 // Number of concurrent workers
 
     for i := 1; i <= workers; i++ {
 		wg.Add(1)
-		go worker(&wg, tasks, dialer)
+		go worker(&wg, tasks, dialer)// Start a worker goroutine
 	}
 
 	ports := 512
 
 	for p := 1; p <= ports; p++ {
 		port := strconv.Itoa(p)
-        address := net.JoinHostPort(target, port)
+        address := net.JoinHostPort(*target, port) // Combine IP and port
 		tasks <- address
 	}
 	close(tasks)

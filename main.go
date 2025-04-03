@@ -44,16 +44,15 @@ func main() {
     target := flag.String("target","scanme.nmap.org", "Specify the IP address or hostname to scan")
 	startPort := flag.Int("start-port", 1, "Specify the starting port")
 	endPort := flag.Int("end-port", 1024, "Specify the ending port")
+	workers := flag.Int("workers", 100, "Specify the number of concurrent workers")
 	
 	flag.Parse() // Parse the command line flags
 
 	dialer := net.Dialer { // Create a new dialer 
 		Timeout: 5 * time.Second,
 	}
-  
-	workers := 100 // Number of concurrent workers
 
-    for i := 1; i <= workers; i++ {// Create worker goroutines
+    for i := 1; i <= *workers; i++ {// Create worker goroutines
 		wg.Add(1)
 		go worker(&wg, tasks, dialer)// Start a worker goroutine
 	}

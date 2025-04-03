@@ -13,7 +13,7 @@ import (
 )
 
 
-func worker(wg *sync.WaitGroup, tasks chan string, dialer net.Dialer, openPorts *int, mu *sync.Mutex) {
+func worker(wg *sync.WaitGroup, tasks chan string, dialer net.Dialer, openPorts *int, mu *sync.Mutex, progress *int, totalPorts int) {
 	defer wg.Done()
 	maxRetries := 3
     for addr := range tasks {
@@ -47,7 +47,14 @@ func worker(wg *sync.WaitGroup, tasks chan string, dialer net.Dialer, openPorts 
 		if !success {
 			fmt.Printf("Failed to connect to %s after %d attempts\n", addr, maxRetries)
 		}
+
+		// Update and print progress
+		mu.Lock() // Lock the mutex to safely update progress
+		*progress++ // Increment the progress counter
+		fmt.Printf("Scanning port %d/%d (%d%% complete)\n", *progress, totalPorts, (*progress*100)/totalPorts) // Print progress
+		mu.Unlock() // Unlock the mutex
 	}
+
 }
 func main() {
 
@@ -68,13 +75,15 @@ func main() {
 	}
 
 	var openPorts int // Counter for open ports
+	var progress int // Progress counter
 	var mu sync.Mutex // Mutex for thread-safe access to openPorts
 
 	startTime := time.Now() // Record the start time
+	totalPorts := *endPort - *startPort + 1 // Calculate the total number of ports scanned
 
     for i := 1; i <= *workers; i++ {// Create worker goroutines
 		wg.Add(1)
-		go worker(&wg, tasks, dialer, &openPorts, &mu) // Start a worker goroutine
+		go worker(&wg, tasks, dialer, &openPorts, &mu, &progress, totalPorts) // Start a worker goroutine
 	}
 
 	// Loop through the specified port range and send addresses to the tasks channel
@@ -84,10 +93,9 @@ func main() {
 		tasks <- address// Send the address to the tasks channel
 	}
 	close(tasks)
-	wg.Wait()
+	wg.Wait() // Wait for all workers to finish
 
 	duration := time.Since(startTime) // Calculate the duration
-	totalPorts := *endPort - *startPort + 1 // Calculate the total number of ports scanned
 
 	fmt.Printf("\nScan Summary\n")
 	fmt.Printf("Number of open ports: %d\n", openPorts)
